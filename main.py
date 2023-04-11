@@ -116,7 +116,7 @@ def main():
             'Authorization': stormglass_credentials['stormglass_api_key']
         }
     )
-    if weather_response.status_code == '200':
+    if weather_response.status_code == 200:
         weather_response = json.loads(weather_response.content)
         for hour_offset, forecast_piece in enumerate(weather_response['hours']):
             forecast_piece_time = time_start + hour_offset * 3600
