@@ -99,9 +99,10 @@ def main():
     time_start = min(list(map(lambda shift: shift['time_start'], schedule)))
     time_end = max(list(map(lambda shift: shift['time_end'], schedule)))
     secondary_group = int(time_start) / 86400 % 2
+    weather = []
     with open(STORMGLASS_CREDENTIALS_FILE, 'r') as stormglass_credentials:
         stormglass_credentials = json.load(stormglass_credentials)
-    weather_response = json.loads(requests.get(
+    weather_response = requests.get(
         'https://api.stormglass.io/v2/weather/point',
         params={
             'lat': '50.435664',
@@ -114,14 +115,15 @@ def main():
         headers={
             'Authorization': stormglass_credentials['stormglass_api_key']
         }
-    ).content)
-    weather = []
-    for hour_offset, forecast_piece in enumerate(weather_response['hours']):
-        forecast_piece_time = time_start + hour_offset * 3600
-        if time_start <= forecast_piece_time < time_end:
-            forecast_piece['time_start'] = forecast_piece_time
-            forecast_piece['time_end'] = forecast_piece_time + 3600
-            weather.append(forecast_piece)
+    )
+    if weather_response.status_code == '200':
+        weather_response = json.loads(weather_response.content)
+        for hour_offset, forecast_piece in enumerate(weather_response['hours']):
+            forecast_piece_time = time_start + hour_offset * 3600
+            if time_start <= forecast_piece_time < time_end:
+                forecast_piece['time_start'] = forecast_piece_time
+                forecast_piece['time_end'] = forecast_piece_time + 3600
+                weather.append(forecast_piece)
     renderer = jinja2.Environment(loader=jinja2.FileSystemLoader('.'))
     renderer.filters['timestamp2date'] = timestamp2date
     renderer.filters['timestamp2time'] = timestamp2time
