@@ -2,6 +2,8 @@ from pytz import timezone
 from datetime import datetime, timedelta, time
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
+import os
+import argparse
 import json
 import asyncio
 import telegram
@@ -10,12 +12,11 @@ import requests
 
 TIMEZONE                    = timezone('Europe/Kyiv')
 DAYS_OFFSET                 = 1
-GOOGLE_CREDENTIALS_FILE     = './google_credentials.json'
-GOOGLE_SPREADSHEET_FILE     = './google_spreadsheet.json'
-TELEGRAM_CONFIGURATION_FILE = './telegram_config.json'
-NOTIFICATION_TEMPLATE_FILE  = './notification.j2'
-STORMGLASS_CREDENTIALS_FILE = './stormglass_credentials.json'
-
+GOOGLE_CREDENTIALS_FILE     = 'google_credentials.json'
+GOOGLE_SPREADSHEET_FILE     = 'google_spreadsheet.json'
+STORMGLASS_CREDENTIALS_FILE = 'stormglass_credentials.json'
+TELEGRAM_CONFIGURATION_FILE = 'telegram_config.json'
+NOTIFICATION_TEMPLATE_FILE  = 'notification.j2'
 
 class Notifier:
     def __init__(self, configuration_file: str):
@@ -50,8 +51,9 @@ class Planner:
         timestamp_range_end = tz.localize(datetime.combine(now.date() + timedelta(days=days + 1), time.min)).timestamp()
         tomorrow_shifts = []
         for row in self.spreadsheet_values:
-            if row[0].isdigit() and timestamp_range_start <= float(row[0]) < timestamp_range_end:
-                tomorrow_shifts.append(row)
+            if(len(row) > 0):
+                if row[0].isdigit() and timestamp_range_start <= float(row[0]) < timestamp_range_end:
+                    tomorrow_shifts.append(row)
         return tomorrow_shifts
 
     def assign_people(self, shift):
@@ -92,15 +94,24 @@ def timestamp2time(timestamp):
 
 
 def main():
+    # Determine the profile's configuration directory
+    profiles_dir = os.path.dirname(os.path.realpath(__file__)) + '/profiles'
+    arguments = argparse.ArgumentParser(description='snake-patrol-bot')
+    arguments.add_argument('-p', '--profile', required=True, help='profile name')
+    arguments = arguments.parse_args()
+    profiles_dir = profiles_dir + '/' + arguments.profile + '/'
     # Form the schedule for the tomorrow day
-    planner = Planner(spreadsheet_file=GOOGLE_SPREADSHEET_FILE, credentials_file=GOOGLE_CREDENTIALS_FILE)
+    planner = Planner(
+        spreadsheet_file=(profiles_dir + GOOGLE_SPREADSHEET_FILE),
+        credentials_file=(profiles_dir + GOOGLE_CREDENTIALS_FILE)
+    )
     schedule = planner.form_schedule(tz=TIMEZONE, days=DAYS_OFFSET)
     # Form the notification text
     time_start = min(list(map(lambda shift: shift['time_start'], schedule)))
     time_end = max(list(map(lambda shift: shift['time_end'], schedule)))
     secondary_group = int(time_start) / 86400 % 2
     weather = []
-    with open(STORMGLASS_CREDENTIALS_FILE, 'r') as stormglass_credentials:
+    with open(profiles_dir + STORMGLASS_CREDENTIALS_FILE, 'r') as stormglass_credentials:
         stormglass_credentials = json.load(stormglass_credentials)
     weather_response = requests.get(
         'https://api.stormglass.io/v2/weather/point',
@@ -124,7 +135,7 @@ def main():
                 forecast_piece['time_start'] = forecast_piece_time
                 forecast_piece['time_end'] = forecast_piece_time + 3600
                 weather.append(forecast_piece)
-    renderer = jinja2.Environment(loader=jinja2.FileSystemLoader('.'))
+    renderer = jinja2.Environment(loader=jinja2.FileSystemLoader(profiles_dir))
     renderer.filters['timestamp2date'] = timestamp2date
     renderer.filters['timestamp2time'] = timestamp2time
     renderer = renderer.get_template(NOTIFICATION_TEMPLATE_FILE)
@@ -135,7 +146,7 @@ def main():
         weather=weather
     )
     # Send the notification
-    notifier = Notifier(configuration_file=TELEGRAM_CONFIGURATION_FILE)
+    notifier = Notifier(configuration_file=(profiles_dir + TELEGRAM_CONFIGURATION_FILE))
     asyncio.run(notifier.notify_people(notification))
 
 
