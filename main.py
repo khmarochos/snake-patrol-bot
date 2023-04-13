@@ -190,7 +190,7 @@ def main():
         logging.warning(f'No weather forecast available ({e}), have to get on without it')
 
     # Form the notification text
-    secondary_group = int(time_start) / 86400 % 2
+    secondary_group = int(time_start / 86400 % 2)
     renderer = jinja2.Environment(loader=jinja2.FileSystemLoader(profiles_dir))
     renderer.filters['timestamp2date'] = timestamp2date
     renderer.filters['timestamp2time'] = timestamp2time
