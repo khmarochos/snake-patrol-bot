@@ -4,14 +4,13 @@
 {% for shift in schedule %}
 👋 {{ shift.time_start | timestamp2time }}—{{ shift.time_end | timestamp2time }}:
 {%- for person in shift.people %} {{ person.name }}
-{%- if person.telegram_handler | length > 0 -%} ({{ person.telegram_handler }}){%- endif -%}
+{%- if person.telegram_handler | length > 0 %} ({{ person.telegram_handler }})
+{%- endif -%}
 {%- endfor -%}
 {% endfor %}
-{% if weather | length > 0 -%}
-Погодні умови протягом цього часу, ймовірно, будуть приблизно такими:
+{% if weather | length > 0 %}Погодні умови протягом цього часу, ймовірно, будуть приблизно такими:
 {% for forecast_piece in weather %}
 ⛅️ {{ forecast_piece.time_start | timestamp2time }}—{{ forecast_piece.time_end | timestamp2time }}: {{ forecast_piece.airTemperature.sg }}°C, {{ forecast_piece.precipitation.sg }} кг/м²/ч, {{ forecast_piece.cloudCover.sg }}%, {{ forecast_piece.humidity.sg }}%
 {%- endfor %}
 {%- endif %}
-
 Гарного вам дня, колеги!

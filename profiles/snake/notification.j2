@@ -3,10 +3,8 @@
 Запрошую долучатися до патрулювання в ніч на {{ start_date | timestamp2date }}. Наразі маємо наступний розклад:
 {% for shift in schedule %}
 👋 {{ shift.time_start | timestamp2time }}—{{ shift.time_end | timestamp2time }}:
-{% for person in shift.people -%}
-{{ person.name }}
-{%- if person.telegram_handler | length > 0 -%}
-({{ person.telegram_handler }})
+{%- for person in shift.people %} {{ person.name }}
+{%- if person.telegram_handler | length > 0 %} ({{ person.telegram_handler }})
 {%- endif -%}
 {%- endfor -%}
 {% endfor %}
