@@ -15,6 +15,7 @@ DAYS_OFFSET                 = 1
 GOOGLE_CREDENTIALS_FILE     = 'google_credentials.json'
 GOOGLE_SPREADSHEET_FILE     = 'google_spreadsheet.json'
 STORMGLASS_CREDENTIALS_FILE = 'stormglass_credentials.json'
+STORMGLASS_CACHE_FILE       = 'stormglass_cache.json'
 TELEGRAM_CONFIGURATION_FILE = 'telegram_config.json'
 NOTIFICATION_TEMPLATE_FILE  = 'notification.j2'
 
@@ -85,6 +86,51 @@ class Planner:
         return schedule
 
 
+def forecast(stormglass_credentials_file: str, stormglass_cache_file: str, time_start: int, time_end: int):
+    update_cache = True
+    if os.path.isfile(stormglass_cache_file):
+        modified_time = datetime.fromtimestamp(os.path.getmtime(stormglass_cache_file))
+        current_time = datetime.now()
+        if current_time - modified_time < timedelta(hours=3):
+            update_cache = False
+    if update_cache:
+        with open(stormglass_credentials_file, 'r') as stormglass_credentials:
+            stormglass_credentials = json.load(stormglass_credentials)
+        weather_response = requests.get(
+            'https://api.stormglass.io/v2/weather/point',
+            params={
+                'lat': '50.435664',
+                'lng': '30.618628',
+                'params': 'airTemperature,pressure,cloudCover,gust,humidity,precipitation,visibility',
+                'start': str(time_start),
+                'end': str((time_start + 86400)),
+                'source': 'sg'
+            },
+            headers={
+                'Authorization': stormglass_credentials['stormglass_api_key']
+            }
+        )
+        if weather_response.status_code == 200:
+            with open(stormglass_cache_file, 'w') as stormglass_cache:
+                stormglass_cache.write(weather_response.content.decode('utf-8'))
+    stormglass_data = {}
+    try:
+        with open(stormglass_cache_file, 'r') as stormglass_cache:
+            stormglass_data = json.load(stormglass_cache)
+    except Exception as e:
+        # I'm going to make it handling the exception a bit later
+        pass
+    forecast_data = []
+    if 'hours' in stormglass_data:
+        for hour_offset, forecast_piece in enumerate(stormglass_data['hours']):
+            forecast_piece_time = time_start + hour_offset * 3600
+            if time_start <= forecast_piece_time < time_end:
+                forecast_piece['time_start'] = forecast_piece_time
+                forecast_piece['time_end'] = forecast_piece_time + 3600
+                forecast_data.append(forecast_piece)
+    return forecast_data
+
+
 def timestamp2date(timestamp):
     return TIMEZONE.localize(datetime.fromtimestamp(int(timestamp))).strftime("%d.%m.%Y")
 
@@ -94,12 +140,14 @@ def timestamp2time(timestamp):
 
 
 def main():
+    home_dir = os.path.dirname(os.path.realpath(__file__))
+    stormglass_cache_dir = home_dir + '/stormglass_cache/'
     # Determine the profile's configuration directory
-    profiles_dir = os.path.dirname(os.path.realpath(__file__)) + '/profiles'
+    profiles_dir = home_dir + '/profiles/'
     arguments = argparse.ArgumentParser(description='snake-patrol-bot')
     arguments.add_argument('-p', '--profile', required=True, help='profile name')
     arguments = arguments.parse_args()
-    profiles_dir = profiles_dir + '/' + arguments.profile + '/'
+    profiles_dir = profiles_dir + arguments.profile + '/'
     # Form the schedule for the tomorrow day
     planner = Planner(
         spreadsheet_file=(profiles_dir + GOOGLE_SPREADSHEET_FILE),
@@ -110,31 +158,12 @@ def main():
     time_start = min(list(map(lambda shift: shift['time_start'], schedule)))
     time_end = max(list(map(lambda shift: shift['time_end'], schedule)))
     secondary_group = int(time_start) / 86400 % 2
-    weather = []
-    with open(profiles_dir + STORMGLASS_CREDENTIALS_FILE, 'r') as stormglass_credentials:
-        stormglass_credentials = json.load(stormglass_credentials)
-    weather_response = requests.get(
-        'https://api.stormglass.io/v2/weather/point',
-        params={
-            'lat': '50.435664',
-            'lng': '30.618628',
-            'params': 'airTemperature,pressure,cloudCover,gust,humidity,precipitation,visibility',
-            'start': str(time_start),
-            'end': str((time_start + 86400)),
-            'source': 'sg'
-        },
-        headers={
-            'Authorization': stormglass_credentials['stormglass_api_key']
-        }
+    weather = forecast(
+        stormglass_credentials_file=(profiles_dir + STORMGLASS_CREDENTIALS_FILE),
+        stormglass_cache_file=(stormglass_cache_dir + STORMGLASS_CACHE_FILE),
+        time_start=time_start,
+        time_end=time_end
     )
-    if weather_response.status_code == 200:
-        weather_response = json.loads(weather_response.content)
-        for hour_offset, forecast_piece in enumerate(weather_response['hours']):
-            forecast_piece_time = time_start + hour_offset * 3600
-            if time_start <= forecast_piece_time < time_end:
-                forecast_piece['time_start'] = forecast_piece_time
-                forecast_piece['time_end'] = forecast_piece_time + 3600
-                weather.append(forecast_piece)
     renderer = jinja2.Environment(loader=jinja2.FileSystemLoader(profiles_dir))
     renderer.filters['timestamp2date'] = timestamp2date
     renderer.filters['timestamp2time'] = timestamp2time
