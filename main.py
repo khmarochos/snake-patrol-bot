@@ -68,12 +68,12 @@ class Planner:
         ).timestamp()
         tomorrow_shifts = []
         for row in self.spreadsheet_values:
-            if (len(row) > 0):
+            if len(row) > 0:
                 if row[0].isdigit() and timestamp_range_start <= float(row[0]) < timestamp_range_end:
                     tomorrow_shifts.append(row)
         return tomorrow_shifts
 
-    def assign_people(self, shift):
+    def assign_people(self, shift: list[str]):
         people = []
         for i in range(2, len(shift) - 1):
             if shift[i] == '0':
@@ -121,7 +121,7 @@ class Synoptic:
                     'lng': '30.618628',
                     'params': 'airTemperature,pressure,cloudCover,gust,humidity,precipitation,visibility',
                     'start': datetime.datetime.timestamp(current_time),
-                    'end': datetime.datetime.timestamp(current_time + datetime.timedelta(86400)),
+                    'end': datetime.datetime.timestamp(current_time + datetime.timedelta(days=1)),
                     'source': 'sg'
                 },
                 headers={

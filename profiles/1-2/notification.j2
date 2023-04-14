@@ -1,4 +1,5 @@
 Вітаю, шановні колеги!
+{%- if schedule | selectattr('people') | list | length > 0 %}
 
 Запрошую долучатися до патрулювання в ніч на {{ start_date | timestamp2date }}. Наразі маємо наступний розклад:
 {% for shift in schedule %}
@@ -14,6 +15,10 @@
 {% for forecast_piece in weather %}
 ⛅️ {{ forecast_piece.time_start | timestamp2time }}—{{ forecast_piece.time_end | timestamp2time }}: {{ forecast_piece.airTemperature.sg }}°C, {{ forecast_piece.precipitation.sg }} кг/м²/ч, {{ forecast_piece.cloudCover.sg }}%, {{ forecast_piece.humidity.sg }}%
 {%- endfor %}
+{%- endif %}
+{%- else %}
+
+На сьогодні нарядів немає.
 {%- endif %}
 
 Гарного вам дня, колеги!
