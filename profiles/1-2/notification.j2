@@ -5,8 +5,8 @@
 {% for shift in schedule %}
 👋 {{ shift.time_start | timestamp2time }}—{{ shift.time_end | timestamp2time }}:
 {%- for person in shift.people %} {{ person.name }}
-{%- if person.telegram_handler | length > 0 %} ({{ person.telegram_handler }})
-{%- endif -%}
+{%- if person.telegram_handler | length > 0 %} ({{ person.telegram_handler }}){%- endif -%}
+{%- if not loop.last %}, {% endif -%}
 {%- endfor -%}
 {%- endfor -%}
 {%- if weather != None %}
